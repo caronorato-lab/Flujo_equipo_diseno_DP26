@@ -74,7 +74,7 @@ def cargar_datos(archivo_excel):
 
 # --- INTERFAZ DE USUARIO ---
 
-st.title("Panel de Control de Diseño DP 2026")
+st.title("Flujo de trabajo equipo de diseño DP 2026")
 st.markdown("Plataforma unificada para el seguimiento de solicitudes de diseño gráfico.")
 
 # Mensaje para subir el archivo
