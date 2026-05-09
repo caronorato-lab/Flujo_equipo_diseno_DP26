@@ -36,7 +36,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Logo de la Defensoría del Pueblo (URL pública oficial de Wikipedia)
-st.image("logo_defensoria.png", width=150)
+st.image(""logo_defensoria.png", width=150)
 
 
 # Caché de Streamlit: La clave del éxito. 
@@ -64,6 +64,14 @@ def cargar_datos(archivo_excel):
         # Llenamos vacíos
         df_completo.fillna("NO REGISTRA", inplace=True)
         
+        # --- NUEVO: PREPARACIÓN DE FECHAS PARA MÉTRICAS ---
+        # Intentamos convertir las columnas de fecha a formato datetime de Pandas para poder hacer matemáticas con ellas.
+        # errors='coerce' hace que si alguien escribió "ayer" en vez de una fecha, se convierta en NaT (Not a Time) en vez de dañar la app.
+        if 'fecha solicitada de entrega' in df_completo.columns:
+            df_completo['fecha_solicitada_limpia'] = pd.to_datetime(df_completo['fecha solicitada de entrega'], errors='coerce')
+        if 'fecha entrega final' in df_completo.columns:
+            df_completo['fecha_entrega_limpia'] = pd.to_datetime(df_completo['fecha entrega final'], errors='coerce')
+            
         return df_completo
         
     except Exception as e:
@@ -95,6 +103,42 @@ with st.spinner("Procesando datos y consolidando pestañas..."):
     df = cargar_datos(archivo_subido)
 
 st.success("✅ Archivo cargado y procesado exitosamente.")
+
+# --- NUEVO: DASHBOARD DE MÉTRICAS GLOBALES ---
+st.markdown("---")
+st.header("📊 Resumen Global de Entregas")
+
+# Calculamos las métricas basándonos en las columnas limpias
+total_solicitudes = len(df)
+
+# 1. Pendientes: Aquellos cuya fecha de entrega final no existe (NaT) o dice "NO REGISTRA"
+pendientes = df['fecha_entrega_limpia'].isna().sum()
+
+# 2. Cumplidos a tiempo: Entregados y cuya fecha de entrega es <= a la solicitada
+# Usamos un filtro doble. Ignoramos los que no tienen fecha solicitada válida para no arrojar errores.
+entregados_df = df.dropna(subset=['fecha_entrega_limpia'])
+cumplidos = len(entregados_df[
+    (entregados_df['fecha_solicitada_limpia'].notna()) & 
+    (entregados_df['fecha_entrega_limpia'] <= entregados_df['fecha_solicitada_limpia'])
+])
+
+# 3. Fuera de tiempo: Entregados, pero la fecha de entrega es > a la solicitada
+fuera_de_tiempo = len(entregados_df[
+    (entregados_df['fecha_solicitada_limpia'].notna()) & 
+    (entregados_df['fecha_entrega_limpia'] > entregados_df['fecha_solicitada_limpia'])
+])
+
+# Mostramos las métricas en 4 columnas visuales
+met1, met2, met3, met4 = st.columns(4)
+with met1:
+    st.metric(label="Total Solicitudes", value=total_solicitudes)
+with met2:
+    st.metric(label="⏳ Pendientes", value=pendientes, delta="Trabajos en cola", delta_color="off")
+with met3:
+    st.metric(label="✅ Cumplidos", value=cumplidos, delta="A tiempo", delta_color="normal")
+with met4:
+    st.metric(label="🚨 Fuera de Tiempo", value=fuera_de_tiempo, delta="Atrasados", delta_color="inverse")
+
 
 st.markdown("---")
 st.header("Filtros de Búsqueda")
@@ -152,7 +196,32 @@ if termino_busqueda:
     if resultados.empty:
         st.warning(f"No se encontraron registros para '{termino_busqueda}' en la categoría seleccionada.")
     else:
-        # Definimos qué columnas se van a mostrar en la tabla final
+        # --- NUEVO: MÉTRICAS ESPECÍFICAS PARA EL RESULTADO DE BÚSQUEDA ---
+        st.markdown(f"### 🎯 Resultados Encontrados ({len(resultados)} registros)")
+        
+        # Calculamos métricas solo para la persona/búsqueda seleccionada
+        res_pendientes = resultados['fecha_entrega_limpia'].isna().sum()
+        res_entregados_df = resultados.dropna(subset=['fecha_entrega_limpia'])
+        
+        res_cumplidos = len(res_entregados_df[
+            (res_entregados_df['fecha_solicitada_limpia'].notna()) & 
+            (res_entregados_df['fecha_entrega_limpia'] <= res_entregados_df['fecha_solicitada_limpia'])
+        ])
+        
+        res_fuera_tiempo = len(res_entregados_df[
+            (res_entregados_df['fecha_solicitada_limpia'].notna()) & 
+            (res_entregados_df['fecha_entrega_limpia'] > res_entregados_df['fecha_solicitada_limpia'])
+        ])
+        
+        # Mostramos unas mini-métricas encima de la tabla
+        rmet1, rmet2, rmet3 = st.columns(3)
+        rmet1.metric("Pendientes", res_pendientes)
+        rmet2.metric("Cumplidos a tiempo", res_cumplidos)
+        rmet3.metric("Fuera de tiempo", res_fuera_tiempo)
+        
+        st.write("") # Espacio en blanco
+
+        # Definimos qué columnas se van a mostrar en la tabla final (ocultamos las fechas limpias de sistema)
         columnas_a_mostrar = [
             'Mes', 
             'solicitud', 
