@@ -36,7 +36,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Logo de la Defensoría del Pueblo (URL pública oficial de Wikipedia)
-st.image("logo_defensoria.png", width=200)
+st.image("logo_defensoria.png", width=500)
 
 
 # Caché de Streamlit: La clave del éxito. 
